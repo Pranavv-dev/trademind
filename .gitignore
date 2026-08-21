@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment — NEVER commit real credentials. .env.example is the template.
+.env
+.env.*
+!.env.example
+
+# Database
+*.db
+*.sqlite3
+
+# Docker
+docker-compose.override.yml
+
+# Node
+node_modules/
+.next/
+out/
+.turbo/
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Celery runtime state (host-local, binary)
+celerybeat-schedule
+celerybeat-schedule.*
+celerybeat.pid
+
+# Build caches
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+.ruff_cache/
+
+# Secrets / keys — belt and braces
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+secrets.*
+credentials.*
+
+# Local QA/audit artifacts — contain personal contact details and stale verdicts.
+# Keep out of the public repo.
+TradeMind_QA_Report.docx
+*_QA_Report.docx

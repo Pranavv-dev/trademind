@@ -1,0 +1,17 @@
+services:
+  backend:
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload
+
+  celery-worker:
+    volumes:
+      - ./backend:/app
+
+  celery-beat:
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    volumes:
+      - ./frontend/src:/app/src

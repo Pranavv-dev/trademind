@@ -1,0 +1,39 @@
+# Secrets — must never enter the build context (Dockerfile does `COPY . .`)
+.env
+.env.*
+!.env.example
+
+# Python caches / build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Test + type caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Celery beat runtime state (host-local; must not be baked into the image)
+celerybeat-schedule
+celerybeat-schedule.*
+celerybeat.pid
+
+# Local databases and logs
+*.db
+*.sqlite3
+*.log
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
