@@ -26,7 +26,7 @@ contributions that make the *strategy* sound better.
 Requires Docker and Docker Compose.
 
 ```bash
-git clone https://github.com/<your-user>/trademind.git
+git clone https://github.com/<your-fork>/trademind.git   # your fork of Pranavv-dev/trademind
 cd trademind
 cp .env.example .env          # placeholders are fine for most development
 

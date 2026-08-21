@@ -30,8 +30,9 @@ plumbing and the evaluation discipline —
   (STT, exchange fees, GST, stamp duty, SEBI turnover) and slippage,
 - a factor **information-coefficient** study that diagnoses *why* a signal fails
   rather than just reporting that it did,
-- walk-forward cross-validation and point-in-time index membership to fight
-  survivorship and lookahead bias,
+- walk-forward cross-validation, with point-in-time index-membership scaffolding
+  to fight survivorship and lookahead bias (built, but **not yet seeded** — see
+  [Known gaps](#honest-status)),
 - an unattended production deployment (daily broker re-auth, scheduling, alerting)
   that runs a full market session without supervision.
 
@@ -148,7 +149,7 @@ data) and a Gemini API key are optional — the system starts without them, with
 reduced functionality.
 
 ```bash
-git clone https://github.com/<your-user>/trademind.git
+git clone https://github.com/Pranavv-dev/trademind.git
 cd trademind
 
 cp .env.example .env      # then fill it in — see Configuration below
@@ -166,15 +167,25 @@ Common tasks are wrapped in the `Makefile`:
 
 ```bash
 make dev        # up with the dev override (hot reload)
-make test       # pytest
+make test       # pytest  ⚠️ drops your dev database — see below
 make lint       # ruff check + format check
 make migrate    # alembic upgrade head
 make logs       # follow all containers
 make down       # stop, preserving volumes
 ```
 
-`make clean` runs `docker compose down -v` and **destroys your Postgres and Redis
-volumes** — including your trade history. Use `make down` for a normal stop.
+Two destructive commands to know about:
+
+- **`make test`** — `backend/tests/conftest.py` runs `create_all`/`drop_all` against the
+  *same* database the dev stack uses, so running the suite drops your tables. If you have
+  paper-trade history you care about, run against a throwaway stack instead:
+  ```bash
+  docker compose -p trademind-test up -d db redis
+  docker compose -p trademind-test run --rm --no-deps backend pytest -q
+  docker compose -p trademind-test down -v
+  ```
+- **`make clean`** — runs `docker compose down -v`, destroying the Postgres and Redis
+  volumes. Use `make down` for a normal stop.
 
 ### Connect market data
 
@@ -201,7 +212,7 @@ to boot.
 | Redis | `REDIS_URL` | Cache + Celery broker |
 | Broker | `KITE_API_KEY`, `KITE_API_SECRET`, `KITE_REDIRECT_URL` | Market data + live orders |
 | Auto-auth | `KITE_AUTO_AUTH_ENABLED`, `KITE_USER_ID`, `KITE_PASSWORD`, `KITE_TOTP_SECRET` | **Off by default. High risk — see SECURITY.md** |
-| LLM | `GEMINI_API_KEY`, `GEMINI_MODEL` | Reasoning + sentiment agents |
+| LLM | `GEMINI_API_KEY`, `GEMINI_MODEL` | ReasoningAgent only — the sentiment agent is keyword-based |
 | Alerts | `DISCORD_WEBHOOK_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Both optional |
 | Trading | `TRADING_MODE`, `DEFAULT_CAPITAL` | **Keep `TRADING_MODE=paper`** |
 

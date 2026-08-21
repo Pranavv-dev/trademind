@@ -90,7 +90,7 @@ TradeMind is an AI-powered paper-trading system for Indian markets (NSE/BSE) run
 | `frontend` | Next.js dashboard, served at localhost:3000 |
 | `celery-beat` | Cron-style scheduler for periodic tasks |
 | `celery-worker` | Executes scheduled and manually-triggered tasks |
-| `db` | PostgreSQL 17 |
+| `db` | PostgreSQL 16 |
 | `redis` | Redis 7 — cache + Celery broker |
 
 ---

@@ -101,26 +101,32 @@ port 5000 can, without a credential:
 In `live` mode that is remote control of a brokerage account by an unauthenticated
 caller.
 
-`docker-compose.yml` publishes ports `3000` and `5000`. **On a cloud host, Docker's
-port publishing writes iptables rules that bypass host firewalls like `ufw`** — so a
-`ufw deny` is not sufficient protection.
+Because of this, **every port in `docker-compose.yml` is bound to `127.0.0.1`** rather
+than to all interfaces:
+
+```yaml
+ports:
+  - "127.0.0.1:5000:5000"
+```
+
+That default matters more than it looks. **On a cloud host, Docker's port publishing
+writes iptables rules that bypass host firewalls like `ufw`** — a `ufw deny` does *not*
+protect a container port published to `0.0.0.0`. Binding to loopback is what actually
+keeps it unreachable.
 
 ### Deploy safely
 
-- **Do not expose 3000 or 5000 to the internet.** Enforce it at the cloud provider's
-  network layer (security list / security group), not just the host firewall.
+- **Keep the loopback bindings.** Widening them to `0.0.0.0` puts unauthenticated
+  brokerage control on the public internet. If you widen them anyway, enforce access at
+  the cloud provider's network layer (security list / security group), not just the
+  host firewall.
 - Reach the dashboard over an **SSH tunnel**:
   ```bash
   ssh -L 3000:localhost:3000 -L 5000:localhost:5000 user@<host>
   ```
   Then open http://localhost:3000 locally. Nothing is publicly reachable.
-- Or bind published ports to loopback only, by editing `docker-compose.yml`:
-  ```yaml
-  ports:
-    - "127.0.0.1:5000:5000"
-  ```
-- If you must expose it, put an authenticating reverse proxy in front (mTLS, OIDC, or
-  at minimum HTTP basic auth over TLS). Do not rely on obscurity.
+- If you genuinely must expose it, put an authenticating reverse proxy in front (mTLS,
+  OIDC, or at minimum HTTP basic auth over TLS). Do not rely on obscurity.
 
 [`docs/DEPLOY_ORACLE_CLOUD.md`](docs/DEPLOY_ORACLE_CLOUD.md) walks through a hardened
 single-host deployment using the SSH-tunnel approach.
@@ -135,12 +141,13 @@ Adding real authentication to the API is a welcome and high-value contribution.
   frontend origin, set it explicitly — do not use `allow_origins=["*"]` with
   `allow_credentials=True`.
 - **Access tokens in Redis.** The daily Kite token is cached in Redis so Celery workers
-  can use it. Never expose Redis (`6379`/`6380`) beyond the Docker network; a reachable
-  Redis hands out a live trading token.
+  can use it. Never expose Redis (`6379`/`6380`) beyond the Docker network — a reachable
+  Redis hands out a live trading token, and it has no password set.
 - **Database defaults.** `trademind_dev` is a development password. Set a real
   `DB_PASSWORD` for anything long-lived.
-- **Postgres and Redis ports** are published to the host (`5433`, `6380`) for local
-  debugging. Bind them to `127.0.0.1` or remove the mappings in production.
+- **Postgres and Redis ports** are published for local debugging (`5433`, `6380`), also
+  loopback-only. Remove the mappings entirely if you don't need `psql`/`redis-cli` from
+  the host.
 - **LLM inputs.** The reasoning and sentiment agents send market data and news text to
   Google Gemini. Assume anything reaching those agents leaves your infrastructure.
 - **Dependencies.** Run `pip-audit` / `npm audit` before deploying; this repo pins
