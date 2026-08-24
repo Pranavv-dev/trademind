@@ -299,6 +299,10 @@ The authors and contributors accept no liability for any financial loss, account
 action, or regulatory consequence arising from use of this software. See
 [LICENSE](LICENSE) — provided "as is", without warranty of any kind.
 
+**On the name.** TradeMind here is an independent, non-commercial open-source project.
+It is not affiliated with, endorsed by, sponsored by, or connected to any other product,
+service, or company using the same or a similar name.
+
 ---
 
 ## License
