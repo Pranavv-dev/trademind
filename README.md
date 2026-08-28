@@ -20,8 +20,8 @@ that tells you whether a strategy on top of it actually works:
 - a factor **information-coefficient** study that diagnoses *why* a signal fails
   rather than just reporting that it did,
 - walk-forward cross-validation, with point-in-time index-membership scaffolding
-  to fight survivorship and lookahead bias (built, but **not yet seeded** — see
-  [Known gaps](#honest-status)).
+  to fight survivorship and lookahead bias (wired up; the shipped membership history
+  starts at 2023 — see [Known gaps](#honest-status)).
 
 The strategy is the replaceable part; the harness is the contribution. It has already
 earned its keep once — it's how the shipped momentum signal was found to have negative
@@ -259,8 +259,14 @@ bull, bear, and sideways regimes, so the *direction* looks real — but the magn
 inflated by survivorship bias (the test used today's index membership over 2021–26) and
 the inversion is **not** what the shipped default does.
 
-**Known gaps:** point-in-time `index_membership` is not seeded, which is the largest
-methodological gap in the backtests; the API has no authentication (see
+**Known gaps:** the backtests now resolve a point-in-time universe when
+`index_membership` is seeded (`python -m app.db.seed_membership`), but the shipped
+reconstitution history only reaches back to **2023-01-01** — the headline 5-year figures
+above cover 2021–2026 and were produced against today's roster, so they remain
+survivorship-inflated until that history is extended. A run whose window starts before
+the seeded coverage now logs `bt_universe_coverage_gap` and carries a
+`universe_warning` on its result rather than silently trading nothing. The API has no
+authentication (see
 [SECURITY.md](SECURITY.md)); the test suite's `conftest.py` runs `create_all`/`drop_all`
 against the **same** database the dev stack uses, so `make test` destroys local trade
 history; the live path is far less exercised than the paper path;

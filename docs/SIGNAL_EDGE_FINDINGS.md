@@ -79,6 +79,15 @@ weaker than the −0.127/−0.078 of the recent window); **volume_zscore +0.034 
 only positive, horizon-strengthening factor → a promising momentum-of-participation lead.**
 
 ### CAVEAT — survivorship bias (important)
+
+> **Update (2026-08-28):** `proactive_backtest.py` previously read the static
+> `NIFTY50` list and never consulted `index_membership` at all, so seeding the table
+> would not have changed these numbers. It now resolves the roster per simulated day
+> when the table is seeded, falls back with a warning when it isn't, and refuses to
+> silently truncate a window that starts before the seeded coverage. The figures below
+> were produced *before* that change and are unrevised — re-running them against a
+> membership history extended back to 2021 is the open task.
+
 The 5y test used TODAY's NIFTY-50 (`index_membership` still not seeded). Backtesting
 today's index members over 2021–26 flatters mean-reversion (today's members all survived /
 recovered). **Treat the +43% magnitude as optimistic; the SIGN and direction are solid.**

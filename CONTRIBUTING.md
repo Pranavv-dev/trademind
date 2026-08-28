@@ -10,9 +10,12 @@ contributions that make the *strategy* sound better.
 1. **Attack the backtest.** Find lookahead bias, survivorship bias, unrealistic fills,
    or cost-model errors in `backend/app/backtest/`. A demonstrated flaw in the harness
    is the single most valuable contribution to this repo.
-2. **Seed point-in-time index membership.** `index_membership` is unseeded, so backtests
-   use today's NIFTY-50 over historical windows. This inflates the mean-reversion
-   results and is the largest known methodological gap.
+2. **Extend the index-membership history.** The backtests resolve a point-in-time
+   universe when `index_membership` is seeded, but the shipped reconstitution data in
+   `backend/app/db/seed_membership.py` only goes back to 2023-01-01 — so the 2021–2026
+   headline window is still scored against today's NIFTY-50. Extending
+   `RECONSTITUTIONS` back from NSE archives is the single highest-value contribution
+   here: it is what decides whether the mean-reversion edge is real or survivorship.
 3. **Add authentication to the API.** See
    [SECURITY.md](SECURITY.md#the-api-has-no-authentication). Currently there is none.
 4. **Out-of-sample strategy validation.** Does the mean-reversion inversion hold on

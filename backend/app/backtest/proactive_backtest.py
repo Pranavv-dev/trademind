@@ -399,6 +399,37 @@ def summarize(trades: list[BTTrade], equity_curve: list[dict], initial: float) -
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# Universe resolution
+# ──────────────────────────────────────────────────────────────────────────
+INDEX_NAME = "NIFTY50"
+
+
+def _fixed_universe(symbols: list[str]):
+    """A universe that never changes — explicit symbols, or the fallback roster."""
+    frozen = list(symbols)
+    return lambda _d: frozen
+
+
+def _membership_universe(tenures: list[tuple[str, date, date | None]]):
+    """Resolve point-in-time membership in memory from overlapping tenures.
+
+    `tenures` is (symbol, from_date, to_date) with to_date=None meaning "still a
+    member". Results are memoised per date: a daily backtest asks for the same
+    roster ~250 times a year and membership only moves at reconstitution.
+    """
+    cache: dict[date, list[str]] = {}
+
+    def universe_on(d: date) -> list[str]:
+        hit = cache.get(d)
+        if hit is None:
+            hit = sorted({sym for sym, frm, to in tenures if frm <= d and (to is None or to >= d)})
+            cache[d] = hit
+        return hit
+
+    return universe_on
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # Runner
 # ──────────────────────────────────────────────────────────────────────────
 async def run_proactive_backtest(
@@ -409,12 +440,67 @@ async def run_proactive_backtest(
     symbols: list[str] | None = None,
 ) -> dict:
     from app.db.repositories.candle_repo import CandleRepository
+    from app.db.repositories.index_membership_repo import IndexMembershipRepository
 
     cfg = cfg or BTConfig()
-    symbols = symbols or list(NIFTY50)
     candle_repo = CandleRepository(session)
 
-    asof = await AsOfCandleRepo.preload(candle_repo, symbols, start, end)
+    # ── Universe: point-in-time membership, or today's roster as a fallback ──
+    #
+    # Scoring every simulated day against TODAY's NIFTY 50 is survivorship bias:
+    # every current member survived, and the names that were dropped for
+    # underperformance are invisible. When index_membership is seeded we resolve
+    # the roster that actually existed on each bar; otherwise we fall back to the
+    # static list and say so loudly, because the resulting numbers are inflated.
+    explicit_symbols = symbols is not None
+    coverage_start: date | None = None
+    membership_repo = IndexMembershipRepository(session)
+    has_membership = (not explicit_symbols) and await membership_repo.has_any(INDEX_NAME)
+
+    if explicit_symbols:
+        universe_method = "explicit_symbols"
+        universe_on = _fixed_universe(list(symbols))
+        preload_symbols = list(symbols)
+    elif has_membership:
+        universe_method = "point_in_time"
+        tenures = await membership_repo.rows_in_range(INDEX_NAME, start, end)
+        universe_on = _membership_universe(tenures)
+        # Preload candles for every name that was a member at ANY point in the
+        # window — the roster changes underneath us as the simulation advances.
+        preload_symbols = sorted({sym for sym, _, _ in tenures})
+
+        # Seeded membership that begins after `start` leaves the early part of the
+        # window with an EMPTY roster: it trades nothing and still reports the full
+        # period, which reads as a valid result. Refuse to be quiet about it.
+        coverage_start = min((frm for _s, frm, _t in tenures), default=None)
+        if coverage_start is not None and coverage_start > start:
+            uncovered_days = (coverage_start - start).days
+            log.warning(
+                "bt_universe_coverage_gap",
+                requested_start=str(start),
+                coverage_start=str(coverage_start),
+                uncovered_days=uncovered_days,
+                reason=(
+                    "index_membership has no rows before coverage_start, so the "
+                    "universe is empty until then and those bars trade nothing. "
+                    "Extend RECONSTITUTIONS in app/db/seed_membership.py, or start "
+                    "the backtest at coverage_start."
+                ),
+            )
+    else:
+        universe_method = "current_only_fallback"
+        log.warning(
+            "bt_universe_fallback",
+            reason=(
+                "index_membership table empty — scoring against today's NIFTY 50. "
+                "Results carry survivorship bias; seed it with "
+                "`python -m app.db.seed_membership`."
+            ),
+        )
+        universe_on = _fixed_universe(list(NIFTY50))
+        preload_symbols = list(NIFTY50)
+
+    asof = await AsOfCandleRepo.preload(candle_repo, preload_symbols, start, end)
     scorer = ContextScorer(candle_repo=asof)  # scorer reads point-in-time via wrapper
     agent = ProactiveAgent(
         agent_id="bt-proactive",
@@ -434,6 +520,7 @@ async def run_proactive_backtest(
         end=str(end),
         n_days=len(dates),
         n_symbols=len(asof._rows),
+        universe_method=universe_method,
         costs=cfg.apply_costs,
     )
 
@@ -447,7 +534,7 @@ async def run_proactive_backtest(
                 pf.check_exits(sym, bar, d)
 
         # 2. score universe point-in-time → watchlist
-        scores = await scorer.score_universe(symbols=symbols)
+        scores = await scorer.score_universe(symbols=universe_on(d))
         if cfg.invert:
             # Mean-reversion: rank by LOWEST 52w proximity (most oversold), take N.
             ranked = sorted(scores.items(), key=lambda kv: kv[1].proximity_52w)[: cfg.max_watchlist]
@@ -541,6 +628,14 @@ async def run_proactive_backtest(
     result = summarize(pf.trades, pf.equity_curve, cfg.initial_capital)
     result["period"] = f"{start} → {end}"
     result["costs_applied"] = cfg.apply_costs
+    result["universe_method"] = universe_method
+    if coverage_start is not None and coverage_start > start:
+        # Carried on the result so a caller writing up the numbers can't miss it.
+        result["universe_coverage_start"] = str(coverage_start)
+        result["universe_warning"] = (
+            f"membership data starts {coverage_start}; bars from {start} to that date "
+            f"had an empty universe and traded nothing"
+        )
     return result
 
 

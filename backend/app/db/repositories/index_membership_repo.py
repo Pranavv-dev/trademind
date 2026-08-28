@@ -38,6 +38,35 @@ class IndexMembershipRepository:
         result = await self.session.execute(stmt)
         return sorted({row[0] for row in result.all()})
 
+    async def rows_in_range(
+        self, index_name: str, start: date, end: date
+    ) -> list[tuple[str, date, date | None]]:
+        """Return every tenure overlapping [start, end] as (symbol, from_date, to_date).
+
+        A daily backtest needs the universe on ~250 dates per year. Rather than
+        issuing one `universe_as_of` query per simulated day, callers can load the
+        overlapping tenures once and resolve membership in memory.
+
+        Overlap rule: from_date <= end AND (to_date IS NULL OR to_date >= start).
+        """
+        stmt = (
+            select(
+                IndexMembership.symbol,
+                IndexMembership.from_date,
+                IndexMembership.to_date,
+            )
+            .where(IndexMembership.index_name == index_name)
+            .where(IndexMembership.from_date <= end)
+            .where(
+                or_(
+                    IndexMembership.to_date.is_(None),
+                    IndexMembership.to_date >= start,
+                )
+            )
+        )
+        result = await self.session.execute(stmt)
+        return [(r[0], r[1], r[2]) for r in result.all()]
+
     async def upsert(
         self, index_name: str, symbol: str, from_date: date, to_date: date | None = None
     ) -> None:
